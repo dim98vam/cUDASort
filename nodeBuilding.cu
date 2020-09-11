@@ -7,6 +7,7 @@ holds the size for each such sebsequence - startOfSequencesDistances contains th
 ----------------------------------streams used are taken from preallocated streams matrix--------------------------------------------*/
 
 __global__ void 
+__launch_bounds__(128,32)
 nodeCreation(double** startOfSequencesPoints, double** startOfSequencesPointsAux, double** startOfSequencesDistances, double** startOfSequencesDistAux,
 	int** startOfSequencesIndexes, int** startOfSequencesIndAux, int* sizeOfSequences, int* nodeLevelndex, int d2, int d1, int* GlobalLess, int* GlobalGreater,
 	int* blockSync, int* pivotIndexMatrix, int* treeIndexTable, double* treeDistancesTable, double* treePointsTable, int treeMatrixSize, uint8_t* LeftChild,

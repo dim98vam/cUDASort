@@ -220,8 +220,8 @@ int verifyTree(vptree* T, double* vp, node** stack, double md, int isInner,
 int main()
 {
 
-	int n =7000;//data
-	int d = 312;//dimensions
+	int n =10000;//data
+	int d = 95;//dimensions
 
 	double* dataArr = (double*)malloc((n * d) * sizeof(double));
 	double* zeros = (double*)calloc(d, sizeof(double));
