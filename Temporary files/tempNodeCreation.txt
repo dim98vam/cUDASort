@@ -1,0 +1,135 @@
+void nodeCreation(double** startOfSequencesPoints,double** startOfSequencesPointsAux,double** startOfSequencesDistances, double** startOfSequencesDistAux, 
+	              int** startOfSequencesIndexes, int** startOfSequencesIndAux, int* sizeOfSequences,int treeLevel,int d2,int d1,int* GlobalLess,
+	              int* GlobalGreater,int* blockSync,int* pivotIndexMatrix,int* treeIndexTable)
+{
+	cudaStream_t stream;                                    //each thread corresponds to a node so it creates a stream to launch the kernels associated 
+	cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);      //with that node in order to achieve maximum concurrency in execution
+
+	unsigned int tid = threadIdx.x;
+	int size = sizeOfSequences[tid]; //get size for current sequence
+
+	if(size!=0)
+	{
+		treeIndexTable[tid] = *(*(startOfSequencesIndexes + tid)+size-1); //TODO->add coordinates in tree table as well - vantage point is taken as the last in 
+	                                                                      //current subsequence
+
+	  if (size > 1) //if thread has a node to process in current level proceed with required actions
+	  {
+		--size; //account for vantage point in table
+		
+		//call distance calculation kernel for assigned part of points with vp being the last element 
+		int blockCount = ((size + distanceCalculationPartSize - 1) / (distanceCalculationPartSize)); //calculate number of blocks to call
+		                                                                                                             
+		
+		//initializing pointers for current node
+		double* points = startOfSequencesPoints[tid]; //pointers to tableOfPoints
+		double* pointsAux = startOfSequencesPointsAux[tid];
+		
+		double* distances = startOfSequencesDistances[tid]; //pointers to tableOfDistances
+		double* distancesAux = startOfSequencesDistAux[tid];
+
+		int* indexes = startOfSequencesIndexes[tid]; //pointers to indexes
+		int* indexesAux = startOfSequencesIndAux[tid];
+		
+		
+		//calculate distnaces from vantage point
+		distanceCalculation << <blockCount, BlockSize,d2*sizeof(double), stream>> > (points,distances, size,d2, points+size,distanceCalculationPartSize,d1);
+		 
+
+	    //implement a quickselect algorithm to divide the sequence into to halves						 
+		
+		int piVot; //assign expected pivot position for block subsequence
+		if ((size+1) & 1)
+			piVot = size / 2; //odd # of points
+		else
+			piVot = size / 2 + 1; //even # of points
+
+		
+		int tempPivot; //variables helping in quickselect implementation
+		double* tempPointer;
+		int* tempPointerInt;
+
+		int counter = 0;
+
+		
+		while (1) //quickselect part 
+		{
+			if (size == 1) //if after accounting for vantage point only one element remains simply add the distance as node's median distance
+			{
+				//TODO!->add distance as node's median distance
+				break;
+			}
+
+			*(GlobalLess + tid) = 0; //initialize global less/greater and blockSync memory positions - accesses are coalesced for speed
+			*(GlobalGreater + tid) = size;
+			*(blockSync + tid) = blockCount;
+
+
+			//call partition kernel for current subsequence - pivot point is chosen as the last point in distance matrix
+			partitionKernel << <blockCount,BlockSize,0, stream >> > (distances,distancesAux,distances+size-1,pivotIndexMatrix+tid,size,distanceCalculationPartSize,
+				                                                    GlobalLess+tid,GlobalGreater+tid,blockSync+tid,indexes,indexesAux,points,pointsAux,d1,d2,size); 
+
+			if (counter & 1) //if counter is odd then copy aux matrix to main matrix to maintain all points partitioned in one matrix for next level
+				copyKernel << <blockCount, BlockSize, 0, stream >> > (pointsAux,points,indexesAux,indexes,size,d1,d2, distanceCalculationPartSize);
+
+			cudaDeviceSynchronize(); //wait for partition and copy kernels to complete
+
+			tempPivot = *(pivotIndexMatrix + tid); //get pivot position returned from partition kernel
+			
+			if (tempPivot == piVot) //if pivot is in its correct position
+			{
+				//TODO->add distance as node's median distance
+				break;
+			}
+
+			//update size/blockCount parameters for next pass
+			if (tempPivot > piVot) //if tempPivot is to the right of the requested pivot index
+				size = tempPivot - 1; //exclude tempPivot from new subsequence - piVot value remains unchanged as well as starting pointers' index 
+			else
+			{
+				size -= tempPivot; //only include elements to the right of tempPivot
+				
+				//update pointers
+				distances += tempPivot;    //distances part
+				distancesAux += tempPivot;
+
+				points += tempPivot;       //points part
+				pointsAux += tempPivot;
+
+				indexes += tempPivot;     //indexes part
+				indexesAux += tempPivot;
+
+				//update piVot
+				piVot -= tempPivot;
+			}
+
+			
+			blockCount = (int)((size + distanceCalculationPartSize - 1) / (distanceCalculationPartSize)); //calculate new blockCount for subsequence
+			
+			tempPointer = distances; //swap distance matrix pointers for next pass
+			distances = distancesAux;
+			distancesAux = tempPointer;
+
+			tempPointer = points; //points swap part
+			points = pointsAux;
+			pointsAux = tempPointer;
+
+			tempPointerInt = indexes;  //indexes swap part
+			indexes = indexesAux;
+			indexesAux = tempPointerInt;
+
+			//update counter
+			++counter;
+
+		} 
+
+
+	  }
+	  else if(size == 1) //if this is a leaf
+	  { 
+	   //TODO!->place zero in node's median distance
+	  }
+	 }
+	
+	//if node has size=0 then it means thread has nothing to add in tree table and spot is simply empty - TODO-> try and save that unused space
+}

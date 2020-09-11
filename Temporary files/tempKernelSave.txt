@@ -1,0 +1,75 @@
+__global__
+void partitionKernel(double* DataSet_Device, double* auxBuffer_Device, double pivot,int* pivotIndex, int size,int partSize,
+                     int* Global_Less, int* Global_Greater, unsigned int* blockSync) 
+{
+	__shared__ int lessThan[sharedMatrixSize];    //matrices to hold count of elements found greater or less than the pivot
+	__shared__ int greaterThan[sharedMatrixSize]; //encoutered by each thread in the block - shared memory used for speed of access
+	__shared__ int sumLess;    //variables to hold running sum value
+	__shared__ int sumGreater; //beggining from zero because sum is exclusive - stored in shared memory to later be used by all threads concurrently
+
+	int tid=threadIdx.x + CONFLICT_FREE_OFFSET(threadIdx.x); //thread index with padding to avoid shared memory bank conflicts
+	
+	
+	if (threadIdx.x == 0) //initialize sumLess and SumGreater variables
+	{
+		sumLess = 0;
+		sumGreater = 0;
+	}
+	
+	lessThan[tid] = 0; //initialize matrices
+	greaterThan[tid] = 0;
+	
+	for (int i= threadIdx.x + blockIdx.x * partSize; i < size && i < partSize*(blockIdx.x+1);
+		i += BlockSize)                 //iterate through the DataSet searching for elements less then or greater then pivot and filling shared buffers
+	{                                   //size checked to make sure last block won't go out o bounds - grid is one dimensional
+		if (DataSet_Device[i] < pivot)
+			++lessThan[tid]; //increase count of less than pivot elements encountered by this thread
+		else
+			++greaterThan[tid]; //increase count of greater than pivot elements encountered by this thread
+	}	                                  
+
+	//first pass of DataSet completed - accumulative sum of elements in shared matrices done now to calculate
+	//where each thread and block should write in the auxBuff - some block synchronization needed now for global cumulative sum in 
+	//global_less and global_greter variables
+
+	__syncthreads(); //synchronize block threads to perform cumulative sum
+
+	parallelCumulative(greaterThan,lessThan,Global_Greater,Global_Less,&sumLess,&sumGreater,threadIdx.x); //perform cumulative sum in parallel
+
+
+	//perform second pass to place elements in auxBuff
+	int indexLess = sumLess + lessThan[tid]; //point to start accessing auxBuff for elements lessThan pivot for current thread
+	int indexGreater = sumGreater + greaterThan[tid]; //point to start accessing auxBuff for elements greaterThan pivot for current thread
+
+	
+	for (int i = threadIdx.x + blockIdx.x * partSize; i < size && i < partSize * (blockIdx.x + 1);
+		i += BlockSize)                                         //go through DataSet again adding elements to auxBuff
+	{
+		if (DataSet_Device[i] < pivot)
+		{
+			auxBuffer_Device[indexLess] = DataSet_Device[i]; //place element less than in aux buff
+			++indexLess;
+		}
+		else 
+		{
+			auxBuffer_Device[indexGreater] = DataSet_Device[i]; //place element greater than in aux buff
+			++indexGreater;
+		}	
+	}
+
+
+	//element placement is complete - update blockSync variable to indicate this block is done - last block also places the pivot in right place
+	//and returns the index to the kernel caller
+    
+	if (threadIdx.x == 0) //no __syncthreads command is used since block synchronization doesn't require all threads of each block to be done
+		                  //only threadId 0 beacause then the atomic add on sumLess done by this block is for sure complete
+	{
+		unsigned int isDone = atomicSub(blockSync,1);
+		if (isDone == 1) //this is the last block to complete
+		{
+			auxBuffer_Device[*Global_Less] = pivot; //place pivot in Global_Less position since this is past the last position 
+			                                        //where less than elements where added (all blocks added to this variable)
+			*pivotIndex = (*Global_Less)+1; //return pivotIndex
+		}
+	}
+}
