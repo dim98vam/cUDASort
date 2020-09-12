@@ -220,14 +220,14 @@ int verifyTree(vptree* T, double* vp, node** stack, double md, int isInner,
 int main()
 {
 
-	int n =10000;//data
+	int n =100000;//data
 	int d = 95;//dimensions
 
 	double* dataArr = (double*)malloc((n * d) * sizeof(double));
 	double* zeros = (double*)calloc(d, sizeof(double));
 
 	foundInTree = (int*)calloc(n, sizeof(int));
-	srand(3);
+	srand(8);
 	
 	for (int i = 0; i < n * d; i++)
 		dataArr[i] = rand() % 300000;
