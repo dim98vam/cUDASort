@@ -227,7 +227,7 @@ int main()
 	double* zeros = (double*)calloc(d, sizeof(double));
 
 	foundInTree = (int*)calloc(n, sizeof(int));
-	srand(8);
+	srand(5);
 	
 	for (int i = 0; i < n * d; i++)
 		dataArr[i] = rand() % 300000;

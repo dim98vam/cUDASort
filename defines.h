@@ -3,7 +3,7 @@
 
 #define BlockSize 64 //define blockSize to use in shared memory allocation
 #define sharedMatrixSize BlockSize+1 //define shared matrix additional size=BlockSize/32-1 in order to avoid bank conflicts
-#define distanceBlockSize 64
+#define distanceBlockSize 128
 #define matrixTransposeBlock 4
 //used in matrix transpose
 #define matrixTransposePoints matrixTransposeBlock
@@ -15,7 +15,7 @@
 #define CONFLICT_FREE_OFFSET_double(n) ((n) >> (LOG_NUM_BANKS-1))  //-1 because since doubles are in mind the effective positions are 16 consecutive instead of 32
 
 //defines used in nodeCalculationKernel
-#define distanceCalculationPartSize BlockSize
+#define distanceCalculationPartSize distanceBlockSize
 #define partitionPartSize BlockSize
 
 //defines used in nodeCreation Kernel and buildVp __host__ function
