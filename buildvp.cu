@@ -314,6 +314,8 @@ vptree* buildvp(double* points,int d1,int d2)
 		cudaFree(Global_Less);
 		cudaFree(Global_Greater);
 		cudaFree(blockSync_Device);
+
+		cudaDeviceReset();
 	}
 	
 	

@@ -11,6 +11,8 @@
 #include <math.h>
 #include <assert.h>
 #include "vptree.h"
+#include "knnSearch.h"
+#include "tester_helper.h"
 
 
 typedef struct node {
@@ -22,7 +24,7 @@ typedef struct node {
 
 //#define VERBOSE
 
-static char* STR_CORRECT_WRONG[] = { "WRONG", "CORRECT" };
+/*static char* STR_CORRECT_WRONG[] = { "WRONG", "CORRECT" };
 
 
 
@@ -213,28 +215,31 @@ int verifyTree(vptree* T, double* vp, node** stack, double md, int isInner,
 	// return 
 	return isValid;
 
-}
+}*/
 
 
 
 int main()
 {
 
-	int n =100000;//data
-	int d = 95;//dimensions
+	int n =12400;//data
+	int d = 3;//dimensions
 
 	double* dataArr = (double*)malloc((n * d) * sizeof(double));
-	double* zeros = (double*)calloc(d, sizeof(double));
+	//double* zeros = (double*)calloc(d, sizeof(double));
 
-	foundInTree = (int*)calloc(n, sizeof(int));
+	//foundInTree = (int*)calloc(n, sizeof(int));
 	srand(5);
 	
 	for (int i = 0; i < n * d; i++)
 		dataArr[i] = rand() % 300000;
+	
+
+	//double dataArr[] = { 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30 };
 
 	vptree* root = buildvp(dataArr, n, d);
 
-	node* stack = NULL;
+	/*node* stack = NULL;
 
 	int isValid = verifyTree(root, zeros, &stack, INFINITY, 1, n, d);
 	int foundAll = 1;
@@ -248,7 +253,40 @@ int main()
 		}
 
 	printf("Tester validation: %s PROPERTIES | %s INDICES\n",
-		STR_CORRECT_WRONG[isValid], STR_CORRECT_WRONG[foundAll]);
+		STR_CORRECT_WRONG[isValid], STR_CORRECT_WRONG[foundAll]);*/
+
+	int* indexes = (int*)malloc(n*3*sizeof(int));
+	double* distances = (double*)malloc(n*3*sizeof(double));
+
+
+	int temp = ((int)floor(log2(n))) + 1;
+	int sizeHolder = (1 << temp)-1;
+	
+	knnresult knnres = *searchQuery(root, 3, sizeHolder, d , dataArr, n);
+
+	for (int i = 0; i < n; ++i)
+	{
+		for (int y = 0; y < 3; ++y)
+		{
+			indexes[i * 3 + y] = knnres.nidx[y * n + i];
+			distances[i * 3 + y] = knnres.ndist[y * n + i];
+		}
+	}
+	
+	knnres.nidx = indexes;
+	knnres.ndist = distances;
+	
+	
+	
+	
+	int isValidC = validateResult(knnres, dataArr, dataArr, n, n, d, 3, COLMAJOR);
+
+	int isValidR = validateResult(knnres, dataArr, dataArr, n, n, d, 3, ROWMAJOR);
+
+	printf("Tester validation: %s NEIGHBORS\n",
+		STR_CORRECT_WRONG[isValidC || isValidR]);
+
+	
 
 	return 0;
 

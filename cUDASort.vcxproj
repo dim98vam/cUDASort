@@ -85,14 +85,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="buildvp.cu" />
+    <CudaCompile Include="knnSearch.cu" />
     <CudaCompile Include="nodeBuilding.cu" />
     <CudaCompile Include="partition.cu" />
     <CudaCompile Include="utilities.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="defines.h" />
+    <ClInclude Include="knnSearch.h" />
     <ClInclude Include="nodeBuilding.h" />
     <ClInclude Include="partition.h" />
+    <ClInclude Include="tester_helper.h" />
     <ClInclude Include="utilities.h" />
     <ClInclude Include="vptree.h" />
   </ItemGroup>
